@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import argparse
+import os
+import pickle
 import readline
 from datetime import datetime
 from hashlib import md5
@@ -44,6 +46,38 @@ class Prediction:
                '{s.realization_date!r}, ' \
                '{s.emission_date!r}' \
                ')'.format(s=self)
+
+
+class PredictionStorage:
+    def __init__(self):
+        self._path = PredictionStorage.__get_storage_path()
+        self.create_file_if_not_exists()
+        self.content = self.__load_data()
+
+    def create_file_if_not_exists(self):
+        if not os.path.exists(self._path):
+            pickle.dump(dict(), open(self._path, 'wb'))
+
+    @staticmethod
+    def __get_storage_path():
+        storage_path = os.environ.get('PREDICTION_DB', None)
+        if storage_path:
+            return storage_path
+        script_path = os.path.dirname(os.path.realpath(__file__))
+        return os.path.join(script_path, 'predictions.pickle')
+
+    def __load_data(self) -> dict:
+        return pickle.load(open(self._path, 'rb'))
+
+    def add(self, prediction: Prediction):
+        self.content[prediction.short_hash()] = prediction
+
+    def save(self):
+        pickle.dump(self.content, open(self._path, 'wb'))
+
+    def get(self, short_id: str) -> Prediction:
+        if short_id in self.content.keys():
+            return self.content[short_id]
 
 
 class PredictionPrinter(GenericPrinter):
@@ -142,14 +176,19 @@ def show_prediction(identifiers: list, __func: callable) -> None:
 def add_prediction(__func: callable):
     builder = InteractivePredictionBuilder()
     confirmed = False
+    storage = PredictionStorage()
+
     while len(builder.get_errors()) or not confirmed:
         builder.build_interactive()
         errors = builder.get_errors()
         if len(errors):
             print(errors)  # todo : check on input instead
         else:
-            PredictionPrinter.print_prediction(builder.build())
+            prediction = builder.build()
+            PredictionPrinter.print_prediction(prediction)
             confirmed = input('Is this OK? [y/n]\t').upper() == 'Y'
+            storage.add(prediction)
+    storage.save()
 
 
 def print_summary(__func: callable):
