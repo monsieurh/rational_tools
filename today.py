@@ -219,7 +219,7 @@ class RecordPrinter(GenericPrinter):
     def print_interactive_properties(interactive_props):
         for prop in interactive_props:
             if interactive_props[prop] is not None:
-                print(colored(prop, attrs=["bold"]) + "\t" + interactive_props[prop])
+                RecordPrinter.print_tabbed(prop, interactive_props[prop])
 
     @staticmethod
     def print_trend(prop: str, loader: DataLoader, record_date: datetime.date, timespan: int = 1) -> None:

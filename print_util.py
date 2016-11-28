@@ -5,14 +5,18 @@ from termcolor import colored
 try:
     term_w, _ = os.get_terminal_size()
 except OSError:
-    term_w = 25
-APP_WIDTH = min(25, term_w)
+    term_w = 80
+APP_WIDTH = min(80, term_w)
 
 
 class GenericPrinter:
     @staticmethod
     def print_header(header_name: str):
         print(header_name.upper().center(APP_WIDTH, '_'))
+
+    @staticmethod
+    def print_tabbed(key:str, value:str):
+        print(colored(key, attrs=["bold"]) + "\t" + value)
 
     @staticmethod
     def print_pair(key, value, color=None, attrs=None):
