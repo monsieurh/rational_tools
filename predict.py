@@ -32,6 +32,9 @@ class Prediction:
             + str(self.emission_date).encode('utf-8')
         ).hexdigest()
 
+    def short_hash(self):
+        return self.hash()[:6]
+
     def __repr__(self):
         return '{s.__class__}' \
                '(' \
@@ -46,12 +49,11 @@ class Prediction:
 class PredictionPrinter(GenericPrinter):
     @staticmethod
     def print_prediction(prediction: Prediction):
-        string = 'Statement :\n' \
-                 '{p.statement}\n' \
-                 'Realization:\t{p.realization_date:%Y-%m-%d}\n' \
-                 'Confidence:\t{p.confidence:.2%}\n' \
-                 'Identifier:\t{hash}\n'.format(p=prediction, hash=prediction.hash())
-        print(string)
+        PredictionPrinter.print_header(prediction.short_hash())
+        PredictionPrinter.print_tabbed('statement', prediction.statement)
+        PredictionPrinter.print_pair('realization', '{0:%Y-%m-%d}'.format(prediction.realization_date))
+        PredictionPrinter.print_pair('confidence', '{0:.2%}'.format(prediction.confidence))
+        PredictionPrinter.print_pair('hash', prediction.hash())
 
 
 class InteractivePredictionBuilder:
@@ -61,9 +63,6 @@ class InteractivePredictionBuilder:
     def get_errors(self) -> list:
         public_attrs = [attr for attr in dir(self.__prediction) if not attr.startswith('__')]
         errors = ['{} not set'.format(attr) for attr in public_attrs if attr is None]
-        if self.__prediction.emission_date is not None and self.__prediction.realization_date is not None and (
-                    self.__prediction.emission_date >= self.__prediction.realization_date):
-            errors.append('you can\'t predict the past')
         return errors
 
     def build_interactive(self):
@@ -71,7 +70,7 @@ class InteractivePredictionBuilder:
         self.__prediction.realization_date = self.__prompt_date('Realization date :\n',
                                                                 self.__prediction.realization_date)
         self.__prediction.confidence = self.prompt_ratio('Confidence :\n', self.__prediction.confidence)
-        self.__fill_input()  # resets fill to ''
+        self.__fill_input()  # resets filling to ''
 
     def build(self) -> Prediction:
         if not self.get_errors():
@@ -82,28 +81,33 @@ class InteractivePredictionBuilder:
         InteractivePredictionBuilder.__fill_input(previous_input)
         statement = None
         while statement is None:
-            statement = str(input(prompt_text))
+            statement = str(InteractivePredictionBuilder.__input(prompt_text))
             statement = statement if len(statement) else None
 
         return statement
 
-    @staticmethod
-    def __prompt_date(prompt_text: str, previous_input: str = None):
+    def __prompt_date(self, prompt_text: str, previous_input: str = None):
         InteractivePredictionBuilder.__fill_input(previous_input)
         date_input = None
         while date_input is None:
             try:
-                date_input = date_parser.parse(input(prompt_text))
+                date_input = date_parser.parse(self.__input(prompt_text))
+                if self.__prediction.emission_date >= date_input:
+                    date_input = None
             except ValueError:
                 pass
         return date_input
+
+    @staticmethod
+    def __input(prompt_text):
+        return input(prompt_text + '\t')
 
     @staticmethod
     def prompt_ratio(prompt_text: str, previous_input: str = None):
         InteractivePredictionBuilder.__fill_input(previous_input)
         ratio = None
         while ratio is None:
-            ratio = InteractivePredictionBuilder.__parse_ratio(input(prompt_text))
+            ratio = InteractivePredictionBuilder.__parse_ratio(InteractivePredictionBuilder.__input(prompt_text))
             ratio = ratio if 0 <= ratio <= 1 else None
         return ratio
 
@@ -139,16 +143,13 @@ def add_prediction(__func: callable):
     builder = InteractivePredictionBuilder()
     confirmed = False
     while len(builder.get_errors()) or not confirmed:
-        try:
-            builder.build_interactive()
-        except KeyboardInterrupt:
-            exit(0)
+        builder.build_interactive()
         errors = builder.get_errors()
         if len(errors):
             print(errors)  # todo : check on input instead
         else:
             PredictionPrinter.print_prediction(builder.build())
-            confirmed = input('Is this OK? [y/n]\n').upper() == 'Y'
+            confirmed = input('Is this OK? [y/n]\t').upper() == 'Y'
 
 
 def print_summary(__func: callable):
@@ -171,7 +172,10 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    args.__func(**vars(args))
+    try:
+        args.__func(**vars(args))
+    except KeyboardInterrupt:
+        exit(0)
 
 """
 behavior :
