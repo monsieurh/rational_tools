@@ -1,0 +1,17 @@
+INTERACTIVE_TAGS:
+  LOG:
+    Aujourd'hui, 
+  NOTE:
+  DREAM:
+    J'ai rêvé
+
+TRENDING:
+  CIG:
+    1
+  WEIGHT:
+    7
+  RATE:
+    7
+
+DATABASE_PATH:
+  /tmp/debug.json
