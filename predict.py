@@ -115,7 +115,7 @@ class PredictionPrinter(GenericPrinter):
         PredictionPrinter.print_pair('statement', prediction.statement)
         if prediction.outcome is not None:
             PredictionPrinter.print_pair('outcome', prediction.outcome)
-        PredictionPrinter.print_pair('realization', '{0:%Y-%m-%d}'.format(prediction.realization_date))
+        PredictionPrinter.print_pair('realization', '{0:%Y-%m-%d@%H:%M}'.format(prediction.realization_date))
         PredictionPrinter.print_pair('confidence', '{0:.2%}'.format(prediction.confidence))
         PredictionPrinter.print_pair('hash', prediction.hash())
 
