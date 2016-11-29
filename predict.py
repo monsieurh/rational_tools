@@ -8,6 +8,7 @@ from datetime import datetime, date
 from hashlib import md5
 
 from dateutil import parser as date_parser
+from termcolor import colored
 
 from print_util import GenericPrinter
 
@@ -17,7 +18,7 @@ __version__ = '0.0.1'
 class Prediction:
     def __init__(self, realization_date: datetime = None, confidence: float = None, statement: str = None):
         self.statement = statement
-        self.outcome = bool
+        self.outcome = None
         self.confidence = confidence
         self.realization_date = realization_date
         self.emission_date = datetime.now()
@@ -41,11 +42,20 @@ class Prediction:
         return '{s.__class__}' \
                '(' \
                '{s.statement!r}, ' \
-               '{s.outcome!s}, ' \
+               '{s.outcome}, ' \
                '{s.confidence!r}, ' \
                '{s.realization_date!r}, ' \
                '{s.emission_date!r}' \
                ')'.format(s=self)
+
+    def get_status(self):
+        if self.realization_date > datetime.now():
+            return 'future'
+
+        if self.outcome is None:
+            return 'pending'
+
+        return 'solved'
 
 
 class PredictionStorage:
@@ -101,7 +111,10 @@ class PredictionPrinter(GenericPrinter):
     @staticmethod
     def print_prediction(prediction: Prediction):
         PredictionPrinter.print_pair('id', prediction.short_hash())
+        PredictionPrinter.print_pair('status', prediction.get_status())
         PredictionPrinter.print_pair('statement', prediction.statement)
+        if prediction.outcome is not None:
+            PredictionPrinter.print_pair('outcome', prediction.outcome)
         PredictionPrinter.print_pair('realization', '{0:%Y-%m-%d}'.format(prediction.realization_date))
         PredictionPrinter.print_pair('confidence', '{0:.2%}'.format(prediction.confidence))
         PredictionPrinter.print_pair('hash', prediction.hash())
@@ -187,8 +200,13 @@ class InteractivePredictionBuilder:
 
 
 # noinspection PyUnusedLocal
-def show_prediction(identifiers: list, __func: callable) -> None:
-    print('SHOW PREDICTION FOR identifiers : {} '.format(identifiers))  # todo
+def show_predictions(identifiers: list, __func: callable) -> None:
+    storage = PredictionStorage()
+    for short_hash in identifiers:
+        prediction = storage.get(short_hash)
+        if prediction:
+            PredictionPrinter.print_prediction(prediction)
+            GenericPrinter.print_line_break()
 
 
 # noinspection PyUnusedLocal
@@ -213,14 +231,25 @@ def add_prediction(__func: callable):
 # noinspection PyUnusedLocal
 def print_summary(__func: callable):
     storage = PredictionStorage()
-    PredictionPrinter.print_pair('past', len(storage.get_past()))
-    PredictionPrinter.print_pair('pending', len(storage.get_future()))
+
+    past_prediction = storage.get_past()
+    solved = [p for p in past_prediction if p.get_status() == 'solved']
+    pending = [p for p in past_prediction if p.get_status() == 'pending']
+
+    PredictionPrinter.print_pair('solved', len(solved))
+    PredictionPrinter.print_pair('future', len(storage.get_future()))
 
     next_prediction = storage.get_next()
     if next_prediction:
         date_str = date.strftime(next_prediction.realization_date, '%Y-%m-%d')
         id_str = next_prediction.short_hash()
         PredictionPrinter.print_pair('next', '\'{}\' on {}'.format(id_str, date_str))
+
+    if len(pending):
+        reminder_string = 'You have {} predictions waiting to be solved ({})'.format(len(pending), ', '.join(
+            [p.short_hash() for p in pending]))
+        print(colored(reminder_string, color='red', attrs=['blink']))
+        # todo : brier score
 
 
 if __name__ == '__main__':
@@ -234,7 +263,7 @@ if __name__ == '__main__':
     add_parser.set_defaults(__func=add_prediction)
 
     show_parser = subparsers.add_parser('show')
-    show_parser.set_defaults(__func=show_prediction)
+    show_parser.set_defaults(__func=show_predictions)
     show_parser.add_argument('identifiers', nargs='+', metavar='IDENTIFIER')
 
     args = parser.parse_args()

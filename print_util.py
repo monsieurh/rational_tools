@@ -15,6 +15,10 @@ class GenericPrinter:
         print(header_name.upper().center(APP_WIDTH, '_'))
 
     @staticmethod
+    def print_line_break():
+        print('-' * APP_WIDTH)
+
+    @staticmethod
     def print_tabbed(key: str, value: str):
         print(colored(key, attrs=["bold"]) + "\t" + value)
 
