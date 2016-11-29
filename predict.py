@@ -6,6 +6,7 @@ import pickle
 import readline
 from datetime import datetime, date
 from hashlib import md5
+from sys import stderr
 
 from dateutil import parser as date_parser
 from termcolor import colored
@@ -23,9 +24,8 @@ class Prediction:
         self.realization_date = realization_date
         self.emission_date = datetime.now()
 
-        self.tags = list()  # todo : optional input of tags and notes
+        self.tags = list()
         self.proof = str()
-        self.notes = str()
 
     def hash(self):
         return md5(
@@ -132,8 +132,11 @@ class PredictionPrinter(GenericPrinter):
         PredictionPrinter.print_pair('hash', prediction.hash())
         if prediction.outcome is not None:
             PredictionPrinter.print_pair('outcome', prediction.outcome)
-        if prediction.proof is not None:
+        if len(prediction.proof):
             PredictionPrinter.print_pair('proof', prediction.proof)
+
+        if len(prediction.tags):
+            PredictionPrinter.print_pair('tags', ', '.join(prediction.tags))
 
 
 class InteractivePrompt:
@@ -168,8 +171,8 @@ class InteractivePrompt:
 
 
 class InteractivePredictionBuilder(InteractivePrompt):
-    def __init__(self):
-        self.__prediction = Prediction()
+    def __init__(self, prediction: Prediction = None):
+        self.__prediction = prediction if prediction is not None else Prediction()
 
     def get_errors(self) -> list:
         public_attrs = [attr for attr in dir(self.__prediction) if not attr.startswith('__')]
@@ -181,7 +184,12 @@ class InteractivePredictionBuilder(InteractivePrompt):
         self.__prediction.realization_date = self.__prompt_date('Realization date :\n',
                                                                 self.__prediction.realization_date)
         self.__prediction.confidence = self.prompt_ratio('Confidence :\n', self.__prediction.confidence)
+        self.edit()
         self.clear_prompt()
+
+    def edit(self):
+        tag_input = self.prompt_text('Tags (comma separated):\n', ', '.join(self.__prediction.tags))
+        self.__prediction.tags = [t.strip() for t in tag_input.split(',') if len(t.strip())]
 
     def build(self) -> Prediction:
         if not self.get_errors():
@@ -285,6 +293,19 @@ def add_prediction(__func: callable):
 
 
 # noinspection PyUnusedLocal
+def edit_prediction(identifier: str, __func: callable):
+    storage = PredictionStorage()
+    prediction = storage.get(identifier)
+    if not prediction:
+        print('Prediction \'{}\' not found'.format(identifier), file=stderr)
+        exit(-1)
+    builder = InteractivePredictionBuilder(prediction)
+    builder.edit()
+    builder.build()
+    storage.save()
+
+
+# noinspection PyUnusedLocal
 def print_summary(__func: callable):
     storage = PredictionStorage()
 
@@ -314,6 +335,10 @@ if __name__ == '__main__':
 
     add_parser = subparsers.add_parser('add')
     add_parser.set_defaults(__func=add_prediction)
+
+    edit_parser = subparsers.add_parser('edit')
+    edit_parser.set_defaults(__func=edit_prediction)
+    edit_parser.add_argument('identifier', metavar='IDENTIFIER')
 
     show_parser = subparsers.add_parser('show')
     show_parser.set_defaults(__func=show_predictions)
