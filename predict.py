@@ -88,6 +88,12 @@ class PredictionStorage:
     def get_past(self) -> list:
         return [p for p in self.content.values() if p.realization_date < self.now]
 
+    def get_pending(self):
+        return [p for p in self.get_past() if p.get_status() == 'pending']
+
+    def get_solved(self):
+        return [p for p in self.get_past() if p.get_status() == 'solved']
+
     def get_future(self) -> list:
         return [p for p in self.content.values() if p.realization_date > self.now]
 
@@ -110,17 +116,51 @@ class PredictionStorage:
 class PredictionPrinter(GenericPrinter):
     @staticmethod
     def print_prediction(prediction: Prediction):
+        PredictionPrinter.print_line_break()
         PredictionPrinter.print_pair('id', prediction.short_hash())
         PredictionPrinter.print_pair('status', prediction.get_status())
         PredictionPrinter.print_pair('statement', prediction.statement)
-        if prediction.outcome is not None:
-            PredictionPrinter.print_pair('outcome', prediction.outcome)
         PredictionPrinter.print_pair('realization', '{0:%Y-%m-%d@%H:%M}'.format(prediction.realization_date))
         PredictionPrinter.print_pair('confidence', '{0:.2%}'.format(prediction.confidence))
         PredictionPrinter.print_pair('hash', prediction.hash())
+        if prediction.outcome is not None:
+            PredictionPrinter.print_pair('outcome', prediction.outcome)
+        if prediction.proof is not None:
+            PredictionPrinter.print_pair('proof', prediction.proof)
 
 
-class InteractivePredictionBuilder:
+class InteractivePrompt:
+    @staticmethod
+    def fill_input(fill_text: str = ''):
+        fill_text = fill_text if fill_text is not None else ''
+        readline.set_startup_hook(lambda: readline.insert_text(str(fill_text)))
+
+    @staticmethod
+    def input(prompt_text):
+        return input(prompt_text + '\t')
+
+    @staticmethod
+    def prompt_bool(prompt_text: str, previous_input: str = None):
+        InteractivePredictionBuilder.fill_input(previous_input)
+        user_input = InteractivePrompt.input(prompt_text)
+        return user_input.lower() in ['yes', 'true', '1', 'y']
+
+    @staticmethod
+    def prompt_text(prompt_text: str, previous_input: str = None):
+        InteractivePredictionBuilder.fill_input(previous_input)
+        statement = None
+        while statement is None:
+            statement = str(InteractivePrompt.input(prompt_text))
+            statement = statement if len(statement) else None
+
+        return statement
+
+    @staticmethod
+    def clear_prompt():
+        InteractivePrompt.fill_input()
+
+
+class InteractivePredictionBuilder(InteractivePrompt):
     def __init__(self):
         self.__prediction = Prediction()
 
@@ -130,32 +170,22 @@ class InteractivePredictionBuilder:
         return errors
 
     def build_interactive(self):
-        self.__prediction.statement = self.__prompt_statement('Statement :\n', self.__prediction.statement)
+        self.__prediction.statement = self.prompt_text('Statement :\n', self.__prediction.statement)
         self.__prediction.realization_date = self.__prompt_date('Realization date :\n',
                                                                 self.__prediction.realization_date)
         self.__prediction.confidence = self.prompt_ratio('Confidence :\n', self.__prediction.confidence)
-        self.__fill_input()  # resets filling to ''
+        self.clear_prompt()
 
     def build(self) -> Prediction:
         if not self.get_errors():
             return self.__prediction
 
-    @staticmethod
-    def __prompt_statement(prompt_text: str, previous_input: str = None):
-        InteractivePredictionBuilder.__fill_input(previous_input)
-        statement = None
-        while statement is None:
-            statement = str(InteractivePredictionBuilder.__input(prompt_text))
-            statement = statement if len(statement) else None
-
-        return statement
-
     def __prompt_date(self, prompt_text: str, previous_input: str = None):
-        InteractivePredictionBuilder.__fill_input(previous_input)
+        InteractivePredictionBuilder.fill_input(previous_input)
         date_input = None
         while date_input is None:
             try:
-                date_input = date_parser.parse(self.__input(prompt_text))
+                date_input = date_parser.parse(self.input(prompt_text))
                 if self.__prediction.emission_date >= date_input:
                     date_input = None
             except ValueError:
@@ -163,15 +193,11 @@ class InteractivePredictionBuilder:
         return date_input
 
     @staticmethod
-    def __input(prompt_text):
-        return input(prompt_text + '\t')
-
-    @staticmethod
     def prompt_ratio(prompt_text: str, previous_input: str = None):
-        InteractivePredictionBuilder.__fill_input(previous_input)
+        InteractivePredictionBuilder.fill_input(previous_input)
         ratio = None
         while ratio is None:
-            ratio = InteractivePredictionBuilder.__parse_ratio(InteractivePredictionBuilder.__input(prompt_text))
+            ratio = InteractivePredictionBuilder.__parse_ratio(InteractivePredictionBuilder.input(prompt_text))
             ratio = ratio if 0 <= ratio <= 1 else None
         return ratio
 
@@ -193,11 +219,6 @@ class InteractivePredictionBuilder:
         except (ValueError, TypeError):
             return None
 
-    @staticmethod
-    def __fill_input(fill_text: str = ''):
-        fill_text = fill_text if fill_text is not None else ''
-        readline.set_startup_hook(lambda: readline.insert_text(str(fill_text)))
-
 
 # noinspection PyUnusedLocal
 def show_predictions(identifiers: list, __func: callable) -> None:
@@ -206,7 +227,35 @@ def show_predictions(identifiers: list, __func: callable) -> None:
         prediction = storage.get(short_hash)
         if prediction:
             PredictionPrinter.print_prediction(prediction)
-            GenericPrinter.print_line_break()
+
+
+# noinspection PyUnusedLocal
+class InteractivePredictionSolver(InteractivePrompt):
+    @staticmethod
+    def solve(prediction: Prediction):
+        prediction.outcome = InteractivePrompt.prompt_bool('Outcome: (True/False)', prediction.outcome)
+
+        prediction.proof = InteractivePrompt.prompt_text('Proof:', prediction.proof)
+        prediction.proof = prediction.proof if len(prediction.proof) else None
+
+
+# noinspection PyUnusedLocal
+def solve_predictions(identifiers: list, __func: callable) -> None:
+    storage = PredictionStorage()
+    if not len(identifiers):
+        identifiers = [p.short_hash() for p in storage.get_pending()]
+    predictions = [storage.get(i) for i in identifiers if storage.get(i) is not None]
+
+    for prediction in predictions:
+        PredictionPrinter.print_prediction(prediction)
+        if input('Solve ? [y/n] ').upper() == 'Y':
+            confirmed = False
+            while not confirmed:
+                InteractivePredictionSolver.solve(prediction)
+                PredictionPrinter.print_prediction(prediction)
+                confirmed = input('Is this OK? [y/n] ').upper() == 'Y'
+
+    storage.save()
 
 
 # noinspection PyUnusedLocal
@@ -223,7 +272,7 @@ def add_prediction(__func: callable):
         else:
             prediction = builder.build()
             PredictionPrinter.print_prediction(prediction)
-            confirmed = input('Is this OK? [y/n]\t').upper() == 'Y'
+            confirmed = input('Is this OK? [y/n] ').upper() == 'Y'
             storage.add(prediction)
     storage.save()
 
@@ -232,11 +281,7 @@ def add_prediction(__func: callable):
 def print_summary(__func: callable):
     storage = PredictionStorage()
 
-    past_prediction = storage.get_past()
-    solved = [p for p in past_prediction if p.get_status() == 'solved']
-    pending = [p for p in past_prediction if p.get_status() == 'pending']
-
-    PredictionPrinter.print_pair('solved', len(solved))
+    PredictionPrinter.print_pair('solved', len(storage.get_pending()))
     PredictionPrinter.print_pair('future', len(storage.get_future()))
 
     next_prediction = storage.get_next()
@@ -245,6 +290,7 @@ def print_summary(__func: callable):
         id_str = next_prediction.short_hash()
         PredictionPrinter.print_pair('next', '\'{}\' on {}'.format(id_str, date_str))
 
+    pending = storage.get_pending()
     if len(pending):
         reminder_string = 'You have {} predictions waiting to be solved ({})'.format(len(pending), ', '.join(
             [p.short_hash() for p in pending]))
@@ -266,6 +312,10 @@ if __name__ == '__main__':
     show_parser.set_defaults(__func=show_predictions)
     show_parser.add_argument('identifiers', nargs='+', metavar='IDENTIFIER')
 
+    solve_parser = subparsers.add_parser('solve')
+    solve_parser.set_defaults(__func=solve_predictions)
+    solve_parser.add_argument('identifiers', nargs='*', metavar='IDENTIFIER')
+
     args = parser.parse_args()
 
     try:
@@ -277,8 +327,8 @@ if __name__ == '__main__':
 behavior :
 1 : noarg -> display current score, pending prediction count, next prediction
 2 : [OK] add -> interactive prompt with new prediction
-3 : solve -> solves passed predictions
-4 : show -> takes number or hash or date as parameter and show a prediction in detail
+3 : solve -> solves past predictions
+4 : [OK] show -> takes number or hash or date as parameter and show a prediction in detail
 5?: stats -> give a tag/range and have stat on this
 6?: search -> by tag/date
 """
