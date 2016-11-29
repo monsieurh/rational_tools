@@ -119,6 +119,9 @@ class PredictionStorage:
     def __load_data(self) -> dict:
         return pickle.load(open(self._path, 'rb'))
 
+    def get_all(self):
+        return [p for p in self.content.values()]
+
 
 class PredictionPrinter(GenericPrinter):
     @staticmethod
@@ -137,6 +140,18 @@ class PredictionPrinter(GenericPrinter):
 
         if len(prediction.tags):
             PredictionPrinter.print_pair('tags', ', '.join(prediction.tags))
+
+    @staticmethod
+    def print_prediction_short(prediction: Prediction):
+        delta = prediction.realization_date - datetime.now()
+        print('{} :\t\'{}\' {:.0%}\t{:%Y-%m-%d} ({} days) {}'.format(
+            prediction.get_status(),
+            prediction.short_hash(),
+            prediction.confidence,
+            prediction.emission_date,
+            delta.days,
+            ', '.join(prediction.tags)
+        ))
 
 
 class InteractivePrompt:
@@ -189,7 +204,7 @@ class InteractivePredictionBuilder(InteractivePrompt):
 
     def edit(self):
         tag_input = self.prompt_text('Tags (comma separated):\n', ', '.join(self.__prediction.tags))
-        self.__prediction.tags = [t.strip() for t in tag_input.split(',') if len(t.strip())]
+        self.__prediction.tags = [t.strip().upper() for t in tag_input.split(',') if len(t.strip())]
 
     def build(self) -> Prediction:
         if not self.get_errors():
@@ -306,6 +321,20 @@ def edit_prediction(identifier: str, __func: callable):
 
 
 # noinspection PyUnusedLocal
+def list_tag(tag: str, __func: callable):
+    storage = PredictionStorage()
+    tagged_predictions = list()
+    if tag:
+        tag = tag.upper()
+        tagged_predictions = [p for p in storage.get_all() if tag in p.tags]
+    else:
+        tagged_predictions = storage.get_all()
+
+    for prediction in tagged_predictions:
+        PredictionPrinter.print_prediction_short(prediction)
+
+
+# noinspection PyUnusedLocal
 def print_summary(__func: callable):
     storage = PredictionStorage()
 
@@ -343,6 +372,10 @@ if __name__ == '__main__':
     show_parser = subparsers.add_parser('show')
     show_parser.set_defaults(__func=show_predictions)
     show_parser.add_argument('identifiers', nargs='+', metavar='IDENTIFIER')
+
+    list_parser = subparsers.add_parser('list')
+    list_parser.set_defaults(__func=list_tag)
+    list_parser.add_argument('tag', nargs='?', metavar='TAG')
 
     solve_parser = subparsers.add_parser('solve')
     solve_parser.set_defaults(__func=solve_predictions)
