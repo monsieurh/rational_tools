@@ -4,7 +4,7 @@ import argparse
 import os
 import pickle
 import readline
-from datetime import datetime
+from datetime import datetime, date
 from hashlib import md5
 
 from dateutil import parser as date_parser
@@ -53,6 +53,33 @@ class PredictionStorage:
         self._path = PredictionStorage.__get_storage_path()
         self.create_file_if_not_exists()
         self.content = self.__load_data()
+        self.now = datetime.now()
+
+    def add(self, prediction: Prediction):
+        self.content[prediction.short_hash()] = prediction
+
+    def save(self):
+        pickle.dump(self.content, open(self._path, 'wb'))
+
+    def get_next(self) -> Prediction:
+        if not len(self.content):
+            return None
+        return sorted(self.get_future(), key=lambda x: x.realization_date)[0]
+
+    def get_last(self) -> Prediction:
+        if not len(self.content):
+            return None
+        return sorted(self.get_past(), key=lambda x: x.realization_date, reversed=True)[0]
+
+    def get(self, short_id: str) -> Prediction:
+        if short_id in self.content.keys():
+            return self.content[short_id]
+
+    def get_past(self) -> list:
+        return [p for p in self.content.values() if p.realization_date < self.now]
+
+    def get_future(self) -> list:
+        return [p for p in self.content.values() if p.realization_date > self.now]
 
     def create_file_if_not_exists(self):
         if not os.path.exists(self._path):
@@ -69,22 +96,12 @@ class PredictionStorage:
     def __load_data(self) -> dict:
         return pickle.load(open(self._path, 'rb'))
 
-    def add(self, prediction: Prediction):
-        self.content[prediction.short_hash()] = prediction
-
-    def save(self):
-        pickle.dump(self.content, open(self._path, 'wb'))
-
-    def get(self, short_id: str) -> Prediction:
-        if short_id in self.content.keys():
-            return self.content[short_id]
-
 
 class PredictionPrinter(GenericPrinter):
     @staticmethod
     def print_prediction(prediction: Prediction):
-        PredictionPrinter.print_header(prediction.short_hash())
-        PredictionPrinter.print_tabbed('statement', prediction.statement)
+        PredictionPrinter.print_pair('id', prediction.short_hash())
+        PredictionPrinter.print_pair('statement', prediction.statement)
         PredictionPrinter.print_pair('realization', '{0:%Y-%m-%d}'.format(prediction.realization_date))
         PredictionPrinter.print_pair('confidence', '{0:.2%}'.format(prediction.confidence))
         PredictionPrinter.print_pair('hash', prediction.hash())
@@ -169,10 +186,12 @@ class InteractivePredictionBuilder:
         readline.set_startup_hook(lambda: readline.insert_text(str(fill_text)))
 
 
+# noinspection PyUnusedLocal
 def show_prediction(identifiers: list, __func: callable) -> None:
     print('SHOW PREDICTION FOR identifiers : {} '.format(identifiers))  # todo
 
 
+# noinspection PyUnusedLocal
 def add_prediction(__func: callable):
     builder = InteractivePredictionBuilder()
     confirmed = False
@@ -191,8 +210,17 @@ def add_prediction(__func: callable):
     storage.save()
 
 
+# noinspection PyUnusedLocal
 def print_summary(__func: callable):
-    print("PRINT SUMMARY")  # todo
+    storage = PredictionStorage()
+    PredictionPrinter.print_pair('past', len(storage.get_past()))
+    PredictionPrinter.print_pair('pending', len(storage.get_future()))
+
+    next_prediction = storage.get_next()
+    if next_prediction:
+        date_str = date.strftime(next_prediction.realization_date, '%Y-%m-%d')
+        id_str = next_prediction.short_hash()
+        PredictionPrinter.print_pair('next', '\'{}\' on {}'.format(id_str, date_str))
 
 
 if __name__ == '__main__':
@@ -219,7 +247,7 @@ if __name__ == '__main__':
 """
 behavior :
 1 : noarg -> display current score, pending prediction count, next prediction
-2 : add -> interactive prompt with new prediction
+2 : [OK] add -> interactive prompt with new prediction
 3 : solve -> solves passed predictions
 4 : show -> takes number or hash or date as parameter and show a prediction in detail
 5?: stats -> give a tag/range and have stat on this
