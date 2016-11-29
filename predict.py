@@ -13,7 +13,7 @@ from termcolor import colored
 
 from print_util import GenericPrinter
 
-__version__ = '0.0.1'
+__version__ = '0.1'
 
 
 class Prediction:
@@ -298,7 +298,7 @@ def add_prediction(__func: callable):
         builder.build_interactive()
         errors = builder.get_errors()
         if len(errors):
-            print(errors)  # todo : check on input instead
+            print(errors)
         else:
             prediction = builder.build()
             PredictionPrinter.print_prediction(prediction)
