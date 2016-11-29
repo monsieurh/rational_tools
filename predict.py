@@ -101,6 +101,13 @@ class PredictionStorage:
         if not os.path.exists(self._path):
             pickle.dump(dict(), open(self._path, 'wb'))
 
+    def get_brier_score(self):
+        total = 0
+        for prediction in self.content.values():
+            outcome = 1 if prediction.outcome is True else 0
+            total += (prediction.confidence - outcome) ** 2
+        return total / len(self.content)
+
     @staticmethod
     def __get_storage_path():
         storage_path = os.environ.get('PREDICTION_DB', None)
@@ -221,15 +228,6 @@ class InteractivePredictionBuilder(InteractivePrompt):
 
 
 # noinspection PyUnusedLocal
-def show_predictions(identifiers: list, __func: callable) -> None:
-    storage = PredictionStorage()
-    for short_hash in identifiers:
-        prediction = storage.get(short_hash)
-        if prediction:
-            PredictionPrinter.print_prediction(prediction)
-
-
-# noinspection PyUnusedLocal
 class InteractivePredictionSolver(InteractivePrompt):
     @staticmethod
     def solve(prediction: Prediction):
@@ -237,6 +235,15 @@ class InteractivePredictionSolver(InteractivePrompt):
 
         prediction.proof = InteractivePrompt.prompt_text('Proof:', prediction.proof)
         prediction.proof = prediction.proof if len(prediction.proof) else None
+
+
+# noinspection PyUnusedLocal
+def show_predictions(identifiers: list, __func: callable) -> None:
+    storage = PredictionStorage()
+    for short_hash in identifiers:
+        prediction = storage.get(short_hash)
+        if prediction:
+            PredictionPrinter.print_prediction(prediction)
 
 
 # noinspection PyUnusedLocal
@@ -289,13 +296,13 @@ def print_summary(__func: callable):
         date_str = date.strftime(next_prediction.realization_date, '%Y-%m-%d')
         id_str = next_prediction.short_hash()
         PredictionPrinter.print_pair('next', '\'{}\' on {}'.format(id_str, date_str))
+    GenericPrinter.print_pair('brier_score', '{:.2f}'.format(storage.get_brier_score()))
 
     pending = storage.get_pending()
     if len(pending):
         reminder_string = 'You have {} predictions waiting to be solved ({})'.format(len(pending), ', '.join(
             [p.short_hash() for p in pending]))
         print(colored(reminder_string, color='red', attrs=['blink']))
-        # todo : brier score
 
 
 if __name__ == '__main__':
@@ -327,8 +334,10 @@ if __name__ == '__main__':
 behavior :
 1 : noarg -> display current score, pending prediction count, next prediction
 2 : [OK] add -> interactive prompt with new prediction
-3 : solve -> solves past predictions
+2': edit -> interactive edition (tags/proof/outcome)
+3 : [OK] solve -> solves past predictions
 4 : [OK] show -> takes number or hash or date as parameter and show a prediction in detail
-5?: stats -> give a tag/range and have stat on this
+4': list -> list predictions
+5?: stats <tag> -> give a tag/range and have stat on this
 6?: search -> by tag/date
 """
