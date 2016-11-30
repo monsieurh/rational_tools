@@ -357,13 +357,14 @@ def print_summary(__func: callable, tag: str = None):
     PredictionPrinter.print_pair('solved', len(solved_list))
     PredictionPrinter.print_pair('future', len(future_list))
 
-    next_prediction = sorted(future_list, key=lambda x: x.realization_date)[0]
-    next_prediction = next_prediction if next_prediction.realization_date > datetime.now() else None
-    if next_prediction:
-        date_str = date.strftime(next_prediction.realization_date, '%Y-%m-%d')
-        id_str = next_prediction.short_hash()
-        PredictionPrinter.print_pair('next', '\'{}\' on {}'.format(id_str, date_str))
-    GenericPrinter.print_pair('brier_score', '{:.2f}'.format(storage.compute_brier_score(predictions)))
+    if len(future_list):
+        next_prediction = sorted(future_list, key=lambda x: x.realization_date)[0]
+        next_prediction = next_prediction if next_prediction.realization_date > datetime.now() else None
+        if next_prediction:
+            date_str = date.strftime(next_prediction.realization_date, '%Y-%m-%d')
+            id_str = next_prediction.short_hash()
+            PredictionPrinter.print_pair('next', '\'{}\' on {}'.format(id_str, date_str))
+        GenericPrinter.print_pair('brier_score', '{:.2f}'.format(storage.compute_brier_score(predictions)))
 
     if len(pending_list):
         reminder_string = 'You have {} predictions waiting to be solved ({})'.format(len(pending_list), ', '.join(
