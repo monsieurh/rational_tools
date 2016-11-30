@@ -4,6 +4,7 @@ import argparse
 import os
 import pickle
 import readline
+from collections import Iterable
 from datetime import datetime, date
 from hashlib import md5
 from sys import stderr
@@ -102,11 +103,19 @@ class PredictionStorage:
             pickle.dump(dict(), open(self._path, 'wb'))
 
     def get_brier_score(self):
+        return self.compute_brier_score(self.content.values())
+
+    @staticmethod
+    def compute_brier_score(prediction_list: Iterable):
+        prediction_list = [p for p in prediction_list if p.get_status() == 'solved']
+        if not len(prediction_list):
+            return None
+
         total = 0
-        for prediction in self.content.values():
+        for prediction in prediction_list:
             outcome = 1 if prediction.outcome is True else 0
             total += (prediction.confidence - outcome) ** 2
-        return total / len(self.content)
+        return total / len(prediction_list)
 
     @staticmethod
     def __get_storage_path():
@@ -335,23 +344,30 @@ def list_tag(tag: str, __func: callable):
 
 
 # noinspection PyUnusedLocal
-def print_summary(__func: callable):
+def print_summary(__func: callable, tag: str = None):
     storage = PredictionStorage()
+    predictions = storage.get_all()
+    if tag:
+        predictions = [p for p in predictions if tag.upper() in p.tags]
 
-    PredictionPrinter.print_pair('solved', len(storage.get_pending()))
-    PredictionPrinter.print_pair('future', len(storage.get_future()))
+    solved_list = [p for p in predictions if p.get_status() == 'solved']
+    future_list = [p for p in predictions if p.get_status() == 'future']
+    pending_list = [p for p in predictions if p.get_status() == 'pending']
 
-    next_prediction = storage.get_next()
+    PredictionPrinter.print_pair('solved', len(solved_list))
+    PredictionPrinter.print_pair('future', len(future_list))
+
+    next_prediction = sorted(future_list, key=lambda x: x.realization_date)[0]
+    next_prediction = next_prediction if next_prediction.realization_date > datetime.now() else None
     if next_prediction:
         date_str = date.strftime(next_prediction.realization_date, '%Y-%m-%d')
         id_str = next_prediction.short_hash()
         PredictionPrinter.print_pair('next', '\'{}\' on {}'.format(id_str, date_str))
-    GenericPrinter.print_pair('brier_score', '{:.2f}'.format(storage.get_brier_score()))
+    GenericPrinter.print_pair('brier_score', '{:.2f}'.format(storage.compute_brier_score(predictions)))
 
-    pending = storage.get_pending()
-    if len(pending):
-        reminder_string = 'You have {} predictions waiting to be solved ({})'.format(len(pending), ', '.join(
-            [p.short_hash() for p in pending]))
+    if len(pending_list):
+        reminder_string = 'You have {} predictions waiting to be solved ({})'.format(len(pending_list), ', '.join(
+            [p.short_hash() for p in pending_list]))
         print(colored(reminder_string, color='red', attrs=['blink']))
 
 
@@ -381,6 +397,10 @@ if __name__ == '__main__':
     solve_parser.set_defaults(__func=solve_predictions)
     solve_parser.add_argument('identifiers', nargs='*', metavar='IDENTIFIER')
 
+    stats_parser = subparsers.add_parser('stats')
+    stats_parser.set_defaults(__func=print_summary)
+    stats_parser.add_argument('tag', nargs='?', metavar='TAG')
+
     args = parser.parse_args()
 
     try:
@@ -392,10 +412,10 @@ if __name__ == '__main__':
 behavior :
 1 : noarg -> display current score, pending prediction count, next prediction
 2 : [OK] add -> interactive prompt with new prediction
-2': edit -> interactive edition (tags/proof/outcome)
+2': [OK] edit -> interactive edition (tags/proof/outcome)
 3 : [OK] solve -> solves past predictions
 4 : [OK] show -> takes number or hash or date as parameter and show a prediction in detail
-4': list -> list predictions
-5?: stats <tag> -> give a tag/range and have stat on this
+4': [OK] list -> list predictions
+5?: [OK] stats <tag> -> give a tag/range and have stat on this
 6?: search -> by tag/date
 """
