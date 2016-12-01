@@ -6,10 +6,18 @@ This is a work in progress, and I'm actively looking for suggestions/ideas/impro
 
 All tools work with in a command line interface with python3.5+. They all have a `-h`/`--help` flag, just run it if you don't know what to do.
 
+##installation
+- Install python3
+- Install pip
+- Run `pip3 -r requirement.txt` to get all the required python modules.
+- Run `./predict.py -h` or whatever tool you want to use
+
 #tools
 ##predict.py
 Keeps track of predictions and their quality. Predictions can not be modified once emitted. (Actually only the tags and the proof can). Computes the brier score on all or a subset of predictions.
-### sample
+###env
+`PREDICTION_DB` environment variable can be used to specify a __file__ to store predictions. (Such has a file in your dropbox/Gdrive/owncloud)
+###sample
 ```
 usage: predict.py [-h] [-v] {add,edit,show,list,solve,stats,del} ...
 
