@@ -385,54 +385,43 @@ def del_prediction(identifier: str, __func: callable):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description='%(prog)s : a python command line tool to note and test the accuracy of your predictions')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s {}'.format(__version__))
     parser.set_defaults(__func=print_summary)
 
-    subparsers = parser.add_subparsers(help='Commands')
+    subparsers = parser.add_subparsers(help='Available commands:')
 
-    add_parser = subparsers.add_parser('add')
+    add_parser = subparsers.add_parser('add', help='Adds a new prediction')
     add_parser.set_defaults(__func=add_prediction)
 
-    edit_parser = subparsers.add_parser('edit')
+    edit_parser = subparsers.add_parser('edit', help='Edits tags and proof of a prediction')
     edit_parser.set_defaults(__func=edit_prediction)
     edit_parser.add_argument('identifier', metavar='IDENTIFIER')
 
-    show_parser = subparsers.add_parser('show')
+    show_parser = subparsers.add_parser('show', help='Shows full details of a prediction')
     show_parser.set_defaults(__func=show_predictions)
     show_parser.add_argument('identifiers', nargs='+', metavar='IDENTIFIER')
 
-    list_parser = subparsers.add_parser('list')
+    list_parser = subparsers.add_parser('list', help='Lists predictions in one-line format')
     list_parser.set_defaults(__func=list_tag)
     list_parser.add_argument('tag', nargs='?', metavar='TAG')
 
-    solve_parser = subparsers.add_parser('solve')
+    solve_parser = subparsers.add_parser('solve', help='Solves predictions that have come to term')
     solve_parser.set_defaults(__func=solve_predictions)
     solve_parser.add_argument('identifiers', nargs='*', metavar='IDENTIFIER')
 
-    stats_parser = subparsers.add_parser('stats')
+    stats_parser = subparsers.add_parser('stats', help='Prints various statistics')
     stats_parser.set_defaults(__func=print_summary)
     stats_parser.add_argument('tag', nargs='?', metavar='TAG')
 
-    del_parser = subparsers.add_parser('del')
+    del_parser = subparsers.add_parser('del', help='Deletes a prediction')
     del_parser.set_defaults(__func=del_prediction)
     del_parser.add_argument('identifier', metavar='IDENTIFIER')
 
     args = parser.parse_args()
 
     try:
-        args.__func(**vars(args))
+        args.__func(**vars(args))  # Calls the function associated with the parser in the '__func' field
     except KeyboardInterrupt:
         exit(0)
-
-"""
-behavior :
-1 : noarg -> display current score, pending prediction count, next prediction
-2 : [OK] add -> interactive prompt with new prediction
-2': [OK] edit -> interactive edition (tags/proof/outcome)
-3 : [OK] solve -> solves past predictions
-4 : [OK] show -> takes number or hash or date as parameter and show a prediction in detail
-4': [OK] list -> list predictions
-5?: [OK] stats <tag> -> give a tag/range and have stat on this
-6?: search -> by tag/date
-"""
