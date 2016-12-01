@@ -109,7 +109,7 @@ class PredictionStorage:
     def compute_brier_score(prediction_list: Iterable):
         prediction_list = [p for p in prediction_list if p.get_status() == 'solved']
         if not len(prediction_list):
-            return None
+            return 2  # Maximum score is default
 
         total = 0
         for prediction in prediction_list:
@@ -130,6 +130,9 @@ class PredictionStorage:
 
     def get_all(self):
         return [p for p in self.content.values()]
+
+    def delete(self, identifier: str):
+        self.content.pop(identifier, None)
 
 
 class PredictionPrinter(GenericPrinter):
@@ -312,7 +315,9 @@ def add_prediction(__func: callable):
             prediction = builder.build()
             PredictionPrinter.print_prediction(prediction)
             confirmed = input('Is this OK? [y/n] ').upper() == 'Y'
-            storage.add(prediction)
+
+    # noinspection PyUnboundLocalVariable
+    storage.add(prediction)
     storage.save()
 
 
@@ -372,6 +377,13 @@ def print_summary(__func: callable, tag: str = None):
         print(colored(reminder_string, color='red', attrs=['blink']))
 
 
+# noinspection PyUnusedLocal
+def del_prediction(identifier: str, __func: callable):
+    storage = PredictionStorage()
+    storage.delete(identifier)
+    storage.save()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-v', '--version', action='version', version='%(prog)s {}'.format(__version__))
@@ -401,6 +413,10 @@ if __name__ == '__main__':
     stats_parser = subparsers.add_parser('stats')
     stats_parser.set_defaults(__func=print_summary)
     stats_parser.add_argument('tag', nargs='?', metavar='TAG')
+
+    del_parser = subparsers.add_parser('del')
+    del_parser.set_defaults(__func=del_prediction)
+    del_parser.add_argument('identifier', metavar='IDENTIFIER')
 
     args = parser.parse_args()
 
