@@ -10,6 +10,7 @@ import sys
 from datetime import datetime, timedelta
 
 import yaml
+from dateutil import parser as date_parser
 from termcolor import colored
 
 from print_util import GenericPrinter
@@ -86,8 +87,11 @@ class ArgumentParser:
 
     def update_date(self, arg: str) -> None:
         assert self.is_date_arg(arg)
-        days = self.split_arg(arg)[1]
-        self.date = datetime.today().date() - timedelta(days=int(days))
+        input_str = self.split_arg(arg)[1]
+        try:
+            self.date = datetime.today().date() - timedelta(days=int(input_str))
+        except:
+            self.date = date_parser.parse(input_str)
 
     def update_payload(self, arg: str) -> None:
         name, value = self.split_arg(arg)
