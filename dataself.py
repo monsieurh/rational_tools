@@ -6,8 +6,9 @@ import os
 from datetime import datetime, timedelta
 
 from matplotlib import pyplot as plt
+from matplotlib.dates import date2num
 
-from today import DataLoader
+from today import DataLoader, Config
 
 
 def get_database() -> DataLoader:
@@ -16,18 +17,38 @@ def get_database() -> DataLoader:
 
 
 def plot(data: DataLoader, props: list, timespan: int) -> None:
+    config = Config.get_config()
+    # Create dates
     current_date = datetime.today().date()
     dates = [current_date - timedelta(days=i) for i in range(timespan)]
-    tag_data_set = [[data.find_prop_value(d, tag.upper()) for d in dates] for tag in props]
+    begin_date = dates[0]  # Find begin date
+
+    # numeric_tagsets = [[data.find_prop_value(d, tag.upper()) for d in dates if d] for tag in props]
+    # numeric data
+    numeric_props=[p for p in props if p not in config.get('INTERACTIVE_TAGS')]
+    numeric_tagsets = [[data.find_prop_value(d, tag.upper()) for d in dates if d] for tag in props if
+                       tag not in config.get('INTERACTIVE_TAGS')]
+    text_tagsets = [[data.find_prop_value(d, tag.upper()) for d in dates if d] for tag in props if
+                    tag in config.get('INTERACTIVE_TAGS')]
 
     plt.xkcd()
 
-    for tagset in tag_data_set:
-        plt.plot(dates, tagset)
+    # plot numeric
+    ycoords = None
+    for tagset in numeric_tagsets:
+        result = plt.plot_date(date2num(dates), tagset, xdate=True, fmt='-')
+        ycoords = result[0]._y
 
-    plt.ioff()
-    plt.title("dataself over {} days (since {})".format(timespan, dates[0]))
-    plt.legend(props)
+    # plot events
+    for events in text_tagsets:
+        for i in range(len(events)):
+            if events[i] is None: continue
+            plt.text(date2num(dates[i]) + 0.1, ycoords[i] + 0.1, events[i],
+                     withdash=True, dashdirection=1, dashlength=100.0,
+                     dashrotation=135)  # todo:if no numeric event
+
+    plt.title("dataself over {} days (since {})".format(timespan, begin_date))
+    plt.legend(numeric_props)
     plt.show()
 
 
