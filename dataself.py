@@ -4,6 +4,7 @@
 import argparse
 import os
 from datetime import datetime, timedelta
+from math import isnan
 
 from matplotlib import pyplot as plt
 from matplotlib.dates import date2num
@@ -21,11 +22,11 @@ def plot(data: DataLoader, props: list, timespan: int) -> None:
     # Create dates
     current_date = datetime.today().date()
     dates = [current_date - timedelta(days=i) for i in range(timespan)]
-    begin_date = dates[0]  # Find begin date
+    begin_date = min(dates)  # Find begin date
 
     # numeric_tagsets = [[data.find_prop_value(d, tag.upper()) for d in dates if d] for tag in props]
     # numeric data
-    numeric_props=[p for p in props if p not in config.get('INTERACTIVE_TAGS')]
+    numeric_props = [p for p in props if p not in config.get('INTERACTIVE_TAGS')]
     numeric_tagsets = [[data.find_prop_value(d, tag.upper()) for d in dates if d] for tag in props if
                        tag not in config.get('INTERACTIVE_TAGS')]
     text_tagsets = [[data.find_prop_value(d, tag.upper()) for d in dates if d] for tag in props if
@@ -43,9 +44,15 @@ def plot(data: DataLoader, props: list, timespan: int) -> None:
     for events in text_tagsets:
         for i in range(len(events)):
             if events[i] is None: continue
-            plt.text(date2num(dates[i]) + 0.1, ycoords[i] + 0.1, events[i],
-                     withdash=True, dashdirection=1, dashlength=100.0,
-                     dashrotation=135)  # todo:if no numeric event
+            rotation = 45 if i > len(events) / 2 else 135
+            y = ycoords[i] if not isnan(ycoords[i]) else 0
+            plt.text(date2num(dates[i]) + 0.1, y + 0.1, events[i],
+                     # todo:if no numeric event (THAT'S THE CASE ON 01/01/17)
+                     withdash=True,
+                     dashdirection=1,
+                     dashlength=100.0,
+                     dashrotation=rotation
+                     )
 
     plt.title("dataself over {} days (since {})".format(timespan, begin_date))
     plt.legend(numeric_props)
