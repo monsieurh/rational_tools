@@ -14,7 +14,8 @@ from termcolor import colored
 
 from print_util import GenericPrinter
 
-__version__ = '0.1'
+__version__ = '0.2'
+__friendly_name__ = 'predict'
 
 
 class Prediction:
@@ -50,13 +51,12 @@ class Prediction:
                ')'.format(s=self)
 
     def get_status(self):
+        if self.outcome is not None:
+            return 'solved'
         if self.realization_date > datetime.now():
             return 'future'
 
-        if self.outcome is None:
-            return 'pending'
-
-        return 'solved'
+        return 'pending'
 
 
 class PredictionStorage:
@@ -155,13 +155,12 @@ class PredictionPrinter(GenericPrinter):
 
     @staticmethod
     def print_prediction_short(prediction: Prediction):
-        delta = prediction.realization_date - datetime.now()
         print('{} :\t\'{}\' {:.0%}\t{:%Y-%m-%d} ({} days) {}'.format(
             prediction.get_status(),
             prediction.short_hash(),
             prediction.confidence,
             prediction.emission_date,
-            delta.days,
+            (prediction.realization_date - datetime.now()).days,
             ', '.join(prediction.tags)
         ))
 
@@ -349,7 +348,7 @@ def list_tag(tag: str, __func: callable):
 
 
 # noinspection PyUnusedLocal
-def print_summary(__func: callable, tag: str = None):
+def print_stats(__func: callable, tag: str = None):
     storage = PredictionStorage()
     predictions = storage.get_all()
     if tag:
@@ -378,6 +377,31 @@ def print_summary(__func: callable, tag: str = None):
 
 
 # noinspection PyUnusedLocal
+def print_action_required(__func: callable):
+    storage = PredictionStorage()
+    predictions = storage.get_all()
+
+    pending_list = [p for p in predictions if p.get_status() == 'pending']
+
+    print('{} : '.format(__friendly_name__), end='')
+    if len(pending_list):
+        reminder_string = 'You have {} predictions waiting to be solved ({})'.format(len(pending_list), ', '.join(
+            [p.short_hash() for p in pending_list]))
+        print(colored(reminder_string, color='red', attrs=['blink']))
+        exit(-1)
+    else:
+        future_list = [p for p in predictions if p.get_status() == 'future']
+        if len(future_list):
+            next_prediction = future_list[0]
+            delta = next_prediction.realization_date - datetime.now()
+            reminder_string = 'Next prediction in {} days'.format(delta.days)
+            print(colored(reminder_string, color='green'))
+        else:
+            solved_list = [p for p in predictions if p.get_status() == 'solved']
+            GenericPrinter.print_pair('brier_score', '{:.2f}'.format(storage.compute_brier_score(solved_list)))
+
+
+# noinspection PyUnusedLocal
 def del_prediction(identifier: str, __func: callable):
     storage = PredictionStorage()
     storage.delete(identifier)
@@ -388,7 +412,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='%(prog)s : a python command line tool to note and test the accuracy of your predictions')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s {}'.format(__version__))
-    parser.set_defaults(__func=print_summary)
+    parser.set_defaults(__func=print_action_required)
 
     subparsers = parser.add_subparsers(help='Available commands:')
 
@@ -411,8 +435,14 @@ if __name__ == '__main__':
     solve_parser.set_defaults(__func=solve_predictions)
     solve_parser.add_argument('identifiers', nargs='*', metavar='IDENTIFIER')
 
+    summary = subparsers.add_parser('summary',
+                                    help='Prints only one line relative to the next action. '
+                                         'Can be a countdown to the next precision, the Brier score, '
+                                         'or a reminder to solve')
+    summary.set_defaults(__func=print_action_required)
+
     stats_parser = subparsers.add_parser('stats', help='Prints various statistics')
-    stats_parser.set_defaults(__func=print_summary)
+    stats_parser.set_defaults(__func=print_stats)
     stats_parser.add_argument('tag', nargs='?', metavar='TAG')
 
     del_parser = subparsers.add_parser('del', help='Deletes a prediction')
