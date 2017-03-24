@@ -53,11 +53,11 @@ class Prediction:
     def get_status(self):
         if self.outcome is not None:
             return 'solved'
+
         if self.realization_date > datetime.now():
             return 'future'
 
         return 'pending'
-
 
 class PredictionStorage:
     def __init__(self):
@@ -392,7 +392,7 @@ def print_action_required(__func: callable):
     else:
         future_list = [p for p in predictions if p.get_status() == 'future']
         if len(future_list):
-            next_prediction = future_list[0]
+            next_prediction = future_list[-1]
             delta = next_prediction.realization_date - datetime.now()
             reminder_string = 'Next prediction in {} days'.format(delta.days)
             print(colored(reminder_string, color='green'))
