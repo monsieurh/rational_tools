@@ -155,10 +155,16 @@ class PredictionPrinter(GenericPrinter):
 
     @staticmethod
     def print_prediction_short(prediction: Prediction):
-        print('{} :\t\'{}\' {:.0%}\t{:%Y-%m-%d} ({} days) {}'.format(
-            prediction.get_status(),
+        if prediction.outcome is True:
+            outcome_color = 'green'
+        elif prediction.outcome is False:
+            outcome_color = 'red'
+        else:
+            outcome_color = 'white'
+        print('[{}] {:.0%}->\t{}\t{:%Y-%m-%d} ({} days)\t{}'.format(
             prediction.short_hash(),
             prediction.confidence,
+            colored(prediction.outcome, color=outcome_color),
             prediction.emission_date,
             (prediction.realization_date - datetime.now()).days,
             ', '.join(prediction.tags)
@@ -343,6 +349,7 @@ def list_tag(tag: str, __func: callable):
     else:
         tagged_predictions = storage.get_all()
 
+    tagged_predictions = sorted(tagged_predictions, key=lambda x: x.realization_date)
     for prediction in tagged_predictions:
         PredictionPrinter.print_prediction_short(prediction)
 
@@ -428,7 +435,7 @@ if __name__ == '__main__':
     show_parser.add_argument('identifiers', nargs='+', metavar='IDENTIFIER')
 
     list_parser = subparsers.add_parser('list', help='Lists predictions in one-line format')
-    list_parser.set_defaults(__func=list_tag) # todo: add RIGHT or WRONG for each line
+    list_parser.set_defaults(__func=list_tag)
     list_parser.add_argument('tag', nargs='?', metavar='TAG')
 
     solve_parser = subparsers.add_parser('solve', help='Solves predictions that have come to term')
