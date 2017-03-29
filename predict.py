@@ -391,8 +391,8 @@ def print_action_required(__func: callable):
         exit(-1)
     else:
         future_list = [p for p in predictions if p.get_status() == 'future']
-        if len(future_list):
-            next_prediction = future_list[-1]
+        next_prediction = storage.get_next()
+        if next_prediction:
             delta = next_prediction.realization_date - datetime.now()
             reminder_string = 'Next prediction in {} days'.format(delta.days)
             print(colored(reminder_string, color='green'))
@@ -428,7 +428,7 @@ if __name__ == '__main__':
     show_parser.add_argument('identifiers', nargs='+', metavar='IDENTIFIER')
 
     list_parser = subparsers.add_parser('list', help='Lists predictions in one-line format')
-    list_parser.set_defaults(__func=list_tag)
+    list_parser.set_defaults(__func=list_tag) # todo: add RIGHT or WRONG for each line
     list_parser.add_argument('tag', nargs='?', metavar='TAG')
 
     solve_parser = subparsers.add_parser('solve', help='Solves predictions that have come to term')
