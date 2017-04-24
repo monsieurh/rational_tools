@@ -165,7 +165,7 @@ class PredictionPrinter(GenericPrinter):
             prediction.short_hash(),
             prediction.confidence,
             colored(prediction.outcome, color=outcome_color),
-            prediction.emission_date,
+            prediction.realization_date,
             (prediction.realization_date - datetime.now()).days,
             ', '.join(prediction.tags)
         ))
