@@ -382,6 +382,14 @@ def print_stats(__func: callable, tag: str = None):
             [p.short_hash() for p in pending_list]))
         print(colored(reminder_string, color='red', attrs=['blink']))
 
+def print_next(__func: callable):
+    storage = PredictionStorage()
+    next_prediction = storage.get_next()
+    if next_prediction is not None:
+        PredictionPrinter.print_prediction(next_prediction)
+    else:
+        print('No next prediction found')
+
 
 # noinspection PyUnusedLocal
 def print_action_required(__func: callable):
@@ -447,6 +455,9 @@ if __name__ == '__main__':
                                          'Can be a countdown to the next precision, the Brier score, '
                                          'or a reminder to solve')
     summary.set_defaults(__func=print_action_required)
+
+    next_parser = subparsers.add_parser('next', help='Prints the next prediction')
+    next_parser.set_defaults(__func=print_next)
 
     stats_parser = subparsers.add_parser('stats', help='Prints various statistics')
     stats_parser.set_defaults(__func=print_stats)
