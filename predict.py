@@ -375,7 +375,9 @@ def print_stats(__func: callable, tag: str = None):
             date_str = date.strftime(next_prediction.realization_date, '%Y-%m-%d')
             id_str = next_prediction.short_hash()
             PredictionPrinter.print_pair('next', '\'{}\' on {}'.format(id_str, date_str))
-    GenericPrinter.print_pair('brier_score', '{:.2f}'.format(storage.compute_brier_score(solved_list)))
+
+    if len(solved_list):
+        GenericPrinter.print_pair('brier_score', '{:.2f}'.format(storage.compute_brier_score(solved_list)))
 
     if len(pending_list):
         reminder_string = 'You have {} predictions waiting to be solved ({})'.format(len(pending_list), ', '.join(
