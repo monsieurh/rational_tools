@@ -142,7 +142,9 @@ class PredictionPrinter(GenericPrinter):
         PredictionPrinter.print_pair('id', prediction.short_hash())
         PredictionPrinter.print_pair('status', prediction.get_status())
         PredictionPrinter.print_pair('statement', prediction.statement)
+        PredictionPrinter.print_pair('emission', '{0:%Y-%m-%d@%H:%M}'.format(prediction.emission_date))
         PredictionPrinter.print_pair('realization', '{0:%Y-%m-%d@%H:%M}'.format(prediction.realization_date))
+        PredictionPrinter.print_pair('duration', '{} days'.format((prediction.realization_date - prediction.emission_date).days))
         PredictionPrinter.print_pair('confidence', '{0:.2%}'.format(prediction.confidence))
         PredictionPrinter.print_pair('hash', prediction.hash())
         if prediction.outcome is not None:
